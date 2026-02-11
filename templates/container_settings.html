@@ -1,96 +1,305 @@
 {% extends "container_base.html" %}
 
-
 {% block menu %}
-<li class="nav-item">
-    <a class="nav-link" href="/containers/admin/dashboard"><i class="fas fa-server me-2"></i>Instances</a>
-</li>
-<li class="nav-item">
-    <a class="nav-link active" data-toggle="pill" href="#settings"><i class="fas fa-cog me-2"></i>Settings</a>
-</li>
-<li class="nav-item">
-    <a class="nav-link" href="/containers/admin/cheat"><i class="fas fa-share-alt me-2"></i>Share Flag</a>
-</li>
+{% include "config/container_menu.html" %}
 {% endblock %}
 
 {% block panel %}
-{% include "components/errors.html" %}
 <div class="card border-0 shadow-sm mb-4 rounded-4">
-    <div class="card-header bg-white border-bottom rounded-top-4">
-        <h5 class="mb-0 text-dark"><i class="fas fa-cog me-2"></i>Container Settings</h5>
-    </div>
-    <div class="card-body p-4">
-        <div class="alert alert-info mb-4 px-4 py-3 rounded-3" style="background:rgba(0,123,255,0.07); border:1px solid #b6e0fe;">
-            <div class="fw-semibold mb-1"><i class="fas fa-info-circle me-2"></i>Instructions</div>
-            <div class="small">
-                The Base URL should be the local socket address of the Docker daemon, i.e. <code>unix://var/run/docker.sock</code>, or it can be a remote SSH address, e.g. <code>ssh://root@example.com</code>.<br>
-                In either case, <b>sudo will not be executed</b>. For a local socket, the user CTFd is running as should have permissions for Docker; for SSH connections, the SSH user in the Base URL should be root or have Docker permissions.
-            </div>
-        </div>
-        <form method="post" action="/containers/admin/api/settings" accept-charset="utf-8" autocomplete="off" role="form" enctype="multipart/form-data">
-            <div class="mb-4">
-                <h6 class="fw-bold text-primary mb-3">Docker Connection</h6>
-                <div class="form-floating mb-3">
-                    <label for="docker_base_url">Base URL</label>
-                    <div>
-                        <small >Docker connection URL. This is the URL of the Docker host. It is used to connect to the Docker host.</small>
-                    </div>
-                    <input type="text" class="form-control rounded-3 bg-light border-0" id="docker_base_url" name="docker_base_url" placeholder="Base URL" value='{{ settings.docker_base_url|default("") }}'>
-                </div>
-                <div class="form-floating mb-3">
-                    <label for="docker_hostname">Hostname for Docker Host</label>
-                    <div>
-                        <small >This is the hostname of the Docker host. It is used to connect to the Docker host.</small>
-                    </div>
-                    <input type="text" class="form-control rounded-3 bg-light border-0" id="docker_hostname" name="docker_hostname" placeholder="Hostname for Docker Host" value='{{ settings.docker_hostname|default("") }}'>
-                </div>
-            </div>
-            <div class="mb-4">
-                <h6 class="fw-bold text-primary mb-3">Container Limits</h6>
-                <div class="form-floating mb-3">
-                    <label for="container_expiration">Container Expiration (minutes)</label>
-                    <div>
-                        <small >Miniute to expire, 0 for no expiration</small>
-                    </div>
-                    <input type="text" class="form-control rounded-3 bg-light border-0" id="container_expiration" name="container_expiration" placeholder="Container Expiration (minutes)" value='{{ settings.container_expiration|default("") }}'>
-                </div>
-                <div class="form-floating mb-3">
-                    <label for="max_containers">Max Containers Per User/Team</label>
-                    <input type="number" class="form-control rounded-3 bg-light border-0" id="max_containers" name="max_containers" placeholder="Max Containers Per User/Team" value='{{ settings.max_containers|default("3") }}'>
-                </div>
-                <div class="form-floating mb-3">
-                    <label for="container_maxmemory">Max Memory (MB)</label>
-                    <input type="number" class="form-control rounded-3 bg-light border-0" id="container_maxmemory" name="container_maxmemory" placeholder="Max Memory (MB)" value='{{ settings.container_maxmemory|default("") }}'>
-                </div>
-                <div class="form-floating mb-3">
-                    <label for="container_maxcpu">Max CPUs (float)</label>
-                    <div>
-                        <small >EG: 1.0, 2.0, 3.0</small>
-                    </div>
-                    <input type="text" class="form-control rounded-3 bg-light border-0" id="container_maxcpu" name="container_maxcpu" placeholder="Max CPUs (float)" value='{{ settings.container_maxcpu|default("") }}'>
-                </div>
-            </div>
-            <div class="mb-4">
-                <h6 class="fw-bold text-primary mb-3">Other Settings</h6>
-                <div class="form-floating mb-3">
-                    <label for="fame_or_shame">Fame or Shame</label>
-                    <div>
-                        <small >Enable to notify when a user or team submit a share flag</small>
-                    </div>
-                    <select class="form-select rounded-3 bg-light border-0" id="fame_or_shame" name="fame_or_shame">
-                        <option value="0" {% if (settings.fame_or_shame|default(0))|int == 0 %}selected{% endif %}>Disable</option>
-                        <option value="1" {% if settings.fame_or_shame|int == 1 %}selected{% endif %}>Enable</option>
-                    </select>
-                </div>
-            </div>
-            <div class="d-grid d-md-flex justify-content-md-end mt-4">
-                <button type="submit" tabindex="0" class="btn btn-primary btn-lg rounded-3 px-5 shadow-sm">
-                    <i class="fas fa-save me-2"></i>Save Settings
-                </button>
-                <input type="hidden" name="nonce" value="{{ Session.nonce }}">
-            </div>
-        </form>
-    </div>
+	<div class="card-header bg-white border-bottom rounded-top-4">
+		<h5 class="mb-0 text-dark"><i class="fas fa-cog me-3"></i>Container Settings</h5>
+	</div>
+	<div class="card-body p-4">
+		<div class="alert alert-info mb-4 px-4 py-3 rounded-3" style="background:rgba(0,123,255,0.07); border:1px solid #b6e0fe;">
+			<div class="fw-semibold mb-1"><i class="fas fa-info-circle me-3"></i>Instructions</div>
+			<div class="small">
+				The Docker connection can be configured as a local socket (<code>unix://var/run/docker.sock</code>) or a remote SSH address (<code>ssh://root@example.com</code>).
+				For local socket, ensure the CTFd user has Docker permissions. For SSH, the user should have root or Docker access.
+			</div>
+		</div>
+		
+		<form id="settings-form">
+			<div class="mb-4">
+				<h6 class="fw-bold text-primary mb-3">Docker Connection</h6>
+				<div class="form-group mb-3">
+					<label for="docker_type">Docker Connection Type</label>
+					<div class="mt-2">
+						<div class="form-check form-check-inline">
+							<input class="form-check-input" type="radio" name="docker_type" id="docker_type_local" value="local" {{ 'checked' if settings.docker_type=='local' or not settings.docker_type else '' }}>
+							<label class="form-check-label" for="docker_type_local">
+								<i class="fas fa-server me-2"></i> Local Docker
+							</label>
+						</div>
+						<div class="form-check form-check-inline">
+							<input class="form-check-input" type="radio" name="docker_type" id="docker_type_ssh" value="ssh" {{ 'checked' if settings.docker_type=='ssh' else '' }}>
+							<label class="form-check-label" for="docker_type_ssh">
+								<i class="fas fa-network-wired me-2"></i> Remote SSH
+							</label>
+						</div>
+					</div>
+				</div>
+
+				<div id="ssh-config-section" style="display: none;">
+					<div class="form-group mb-3">
+						<label for="ssh_hostname">Hostname / IP Address</label>
+						<input class="form-control rounded-3 bg-light border-0" type="text" name="ssh_hostname" id="ssh_hostname" placeholder="192.168.1.100 or docker.example.com" value="{{ settings.ssh_hostname }}">
+					</div>
+					<div class="row">
+						<div class="col-md-8">
+							<div class="form-group mb-3">
+								<label for="ssh_user">SSH User</label>
+								<input class="form-control rounded-3 bg-light border-0" type="text" name="ssh_user" id="ssh_user" placeholder="root" value="{{ settings.ssh_user or 'root' }}">
+							</div>
+						</div>
+						<div class="col-md-4">
+							<div class="form-group mb-3">
+								<label for="ssh_port">Port</label>
+								<input class="form-control rounded-3 bg-light border-0" type="number" name="ssh_port" id="ssh_port" placeholder="22" value="{{ settings.ssh_port or '22' }}">
+							</div>
+						</div>
+					</div>
+				<div class="form-group mb-3">
+					<label for="ssh_key_content">SSH Private Key</label>
+					{% if settings.ssh_key_configured %}
+					<div class="alert alert-success py-2 px-3 mb-2">
+						<i class="fas fa-check-circle me-2"></i> SSH key is configured. Paste a new key below to replace it.
+					</div>
+					{% endif %}
+					<textarea class="form-control rounded-3 bg-light border-0" name="ssh_key_content" id="ssh_key_content" rows="8" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;..."></textarea>
+					<small class="form-text text-muted">Paste your SSH private key here (ed25519, RSA, etc.). Leave empty to keep the existing key.</small>
+				</div>
+					<div class="form-group mb-3">
+						<label for="ssh_known_hosts">Known Hosts Entry</label>
+						<textarea class="form-control rounded-3 bg-light border-0" name="ssh_known_hosts" id="ssh_known_hosts" rows="3" placeholder="192.168.1.100 ssh-ed25519 AAAA...">{{ settings.ssh_known_hosts }}</textarea>
+						<small class="form-text text-muted">Get it with: <code>ssh-keyscan hostname</code></small>
+					</div>
+				</div>
+
+				<div class="form-group mb-3">
+					<label for="docker_hostname">Connection Hostname (for users)</label>
+					<input class="form-control rounded-3 bg-light border-0" type="text" name="connection_host" id="docker_hostname" placeholder="example.com or 10.0.1.8" value="{{ settings.docker_hostname }}">
+					<small class="form-text text-muted">Hostname displayed to users in connection strings</small>
+				</div>
+			</div>
+
+			<div class="mb-4">
+				<h6 class="fw-bold text-primary mb-3">Container Limits</h6>
+				<div class="form-group mb-3">
+					<label for="container_expiration">Default Container Timeout (minutes)</label>
+					<input class="form-control rounded-3 bg-light border-0" type="number" name="default_timeout" id="container_expiration" placeholder="60" value="{{ settings.container_expiration }}">
+					<small class="form-text text-muted">How long containers run before auto-termination (0 = never)</small>
+				</div>
+				<div class="form-group mb-3">
+					<label for="max_renewals">Default Max Renewals</label>
+					<input class="form-control rounded-3 bg-light border-0" type="number" name="max_renewals" id="max_renewals" placeholder="3" value="{{ settings.max_renewals }}">
+					<small class="form-text text-muted">Maximum number of times users can extend container lifetime</small>
+				</div>
+				<div class="form-group mb-3">
+					<label for="container_max_concurrent_count">Max Concurrent Containers (per User/Team)</label>
+					<input class="form-control rounded-3 bg-light border-0" type="number" name="container_max_concurrent_count" id="container_max_concurrent_count" placeholder="3" value="{{ settings.container_max_concurrent_count }}">
+					<small class="form-text text-muted">Maximum number of containers a user or team can run simultaneously</small>
+				</div>
+				<div class="form-group mb-3">
+					<label for="container_maxmemory">Max Memory per Container</label>
+					<input class="form-control rounded-3 bg-light border-0" type="text" name="max_memory" id="container_maxmemory" placeholder="512m" value="{{ settings.container_maxmemory }}">
+					<small class="form-text text-muted">e.g., 512m, 1g</small>
+				</div>
+				<div class="form-group mb-3">
+					<label for="container_maxcpu">Max CPUs per Container</label>
+					<input class="form-control rounded-3 bg-light border-0" type="text" name="max_cpu" id="container_maxcpu" placeholder="1.0" value="{{ settings.container_maxcpu }}">
+					<small class="form-text text-muted">Float value, e.g., 1.5 means 1.5 cores maximum</small>
+				</div>
+			</div>
+
+			<div class="mb-4">
+				<h6 class="fw-bold text-primary mb-3">Port Configuration</h6>
+				<div class="row">
+					<div class="col-md-6">
+						<div class="form-group mb-3">
+							<label for="port_range_start">Port Range Start</label>
+							<input class="form-control rounded-3 bg-light border-0" type="number" name="port_range_start" id="port_range_start" placeholder="30000" value="{{ settings.port_range_start }}">
+						</div>
+					</div>
+					<div class="col-md-6">
+						<div class="form-group mb-3">
+							<label for="port_range_end">Port Range End</label>
+							<input class="form-control rounded-3 bg-light border-0" type="number" name="port_range_end" id="port_range_end" placeholder="31000" value="{{ settings.port_range_end }}">
+						</div>
+					</div>
+				</div>
+				<div class="alert alert-warning">
+					<i class="fas fa-exclamation-triangle me-3"></i><strong>Note:</strong>
+					Make sure these ports are open in your firewall and not used by other services.
+				</div>
+			</div>
+
+			<div class="mb-4">
+				<h6 class="fw-bold text-primary mb-3">Anti-Cheat & Flag Settings</h6>
+				<div class="form-group mb-3">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" name="fame_or_shame" id="fame_or_shame" value="1" {{ 'checked' if settings.fame_or_shame=='1' else '' }}>
+						<label class="form-check-label" for="fame_or_shame">
+							<strong>Fame or Shame</strong>
+						</label>
+					</div>
+					<small class="form-text text-muted">When enabled, cheating attempts (flag reuse) will be publicly announced via notifications.</small>
+				</div>
+				<div class="form-group mb-3">
+					<label for="teencode_count">Teencode Transformation Count</label>
+					<input class="form-control rounded-3 bg-light border-0" type="number" name="teencode_count" id="teencode_count" placeholder="8" min="0" max="32" value="{{ settings.teencode_count or '8' }}">
+					<small class="form-text text-muted">Number of characters to transform with teencode obfuscation in flags (0-32).</small>
+				</div>
+			</div>
+
+			<div class="mb-4">
+				<h6 class="fw-bold text-primary mb-3">Subdomain Routing (Traefik)</h6>
+				<div class="form-group mb-3">
+					<div class="form-check">
+						<input class="form-check-input" type="checkbox" name="subdomain_enabled" id="subdomain_enabled" value="true" {{ 'checked' if settings.subdomain_enabled=='true' else '' }}>
+						<label class="form-check-label" for="subdomain_enabled">
+							<strong>Enable Subdomain Routing</strong>
+						</label>
+					</div>
+					<small class="form-text text-muted">When enabled, challenges with connection type "http", "https", or "web" will get a random subdomain instead of port-based access.</small>
+				</div>
+				<div id="subdomain-config-section" style="display: none;">
+					<div class="form-group mb-3">
+						<label for="subdomain_base_domain">Base Domain</label>
+						<input class="form-control rounded-3 bg-light border-0" type="text" name="subdomain_base_domain" id="subdomain_base_domain" placeholder="challenges.example.com" value="{{ settings.subdomain_base_domain }}">
+						<small class="form-text text-muted">Base domain for challenges. Make sure you have a wildcard DNS record: <code>*.challenges.example.com</code></small>
+					</div>
+					<div class="form-group mb-3">
+						<label for="subdomain_network">Docker Network Name</label>
+						<input class="form-control rounded-3 bg-light border-0" type="text" name="subdomain_network" id="subdomain_network" placeholder="ctfd-challenges" value="{{ settings.subdomain_network or 'ctfd-challenges' }}">
+						<small class="form-text text-muted">Docker network where Traefik can reach challenge containers.</small>
+					</div>
+				</div>
+			</div>
+
+			<div class="mb-4">
+				<h6 class="fw-bold text-primary mb-3">Notifications</h6>
+				<div class="form-group mb-3">
+					<label for="container_discord_webhook_url">Discord Webhook URL</label>
+					<input class="form-control rounded-3 bg-light border-0" type="text" name="container_discord_webhook_url" id="container_discord_webhook_url" placeholder="https://discord.com/api/webhooks/..." value="{{ settings.container_discord_webhook_url }}">
+					<small class="form-text text-muted">Optional: URL to send notifications for Cheat Alerts and System Errors. Leave empty to disable.</small>
+					<div class="mt-2">
+						<button type="button" class="btn btn-outline-success btn-sm" onclick="testWebhook('connection')">
+							<i class="fas fa-plug me-2"></i> Test Connection
+						</button>
+						<button type="button" class="btn btn-outline-danger btn-sm" onclick="testWebhook('demo_cheat')">
+							<i class="fas fa-exclamation-triangle me-2"></i> Demo Cheat
+						</button>
+						<button type="button" class="btn btn-outline-warning btn-sm" onclick="testWebhook('demo_error')">
+							<i class="fas fa-bug me-2"></i> Demo Error
+						</button>
+					</div>
+				</div>
+			</div>
+
+			<div class="d-grid d-md-flex justify-content-md-end mt-4">
+				<button type="submit" class="btn btn-primary btn-lg rounded-3 px-5 shadow-sm">
+					<i class="fas fa-save me-3"></i>Save Settings
+				</button>
+			</div>
+		</form>
+	</div>
 </div>
+
 {% include "config/container_status.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+	// Toggle SSH config section
+	function toggleDockerType() {
+		const sshRadio = document.getElementById('docker_type_ssh');
+		const sshSection = document.getElementById('ssh-config-section');
+		if (sshRadio.checked) {
+			sshSection.style.display = 'block';
+		} else {
+			sshSection.style.display = 'none';
+		}
+	}
+
+	// Toggle Subdomain config section
+	function toggleSubdomainConfig() {
+		const checkbox = document.getElementById('subdomain_enabled');
+		const section = document.getElementById('subdomain-config-section');
+		if (checkbox.checked) {
+			section.style.display = 'block';
+		} else {
+			section.style.display = 'none';
+		}
+	}
+
+	// Initialize
+	document.addEventListener('DOMContentLoaded', function () {
+		toggleDockerType();
+		toggleSubdomainConfig();
+		document.getElementById('docker_type_local').addEventListener('change', toggleDockerType);
+		document.getElementById('docker_type_ssh').addEventListener('change', toggleDockerType);
+		document.getElementById('subdomain_enabled').addEventListener('change', toggleSubdomainConfig);
+	});
+
+	document.getElementById('settings-form').addEventListener('submit', function (e) {
+		e.preventDefault();
+		const formData = new FormData(this);
+		if (!document.getElementById('subdomain_enabled').checked) {
+			formData.append('subdomain_enabled', 'false');
+		}
+		const data = Object.fromEntries(formData);
+		fetch('{{ url_for("containers_admin.api_config_update") }}', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'CSRF-Token': '{{ Session.nonce }}'
+			},
+			body: JSON.stringify(data)
+		})
+		.then(r => r.json())
+		.then(data => {
+			if (data.success) {
+				alert('Settings saved successfully');
+				location.reload();
+			} else {
+				alert('Error: ' + (data.error || 'Unknown error'));
+			}
+		})
+		.catch(e => alert('Network error: ' + e));
+	});
+
+	// Webhook testing
+	function testWebhook(type) {
+		const url = document.getElementById('container_discord_webhook_url').value;
+		if (!url) {
+			alert('Please enter a Webhook URL first');
+			return;
+		}
+		const btn = event.target.closest('button');
+		const originalText = btn.innerHTML;
+		btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+		btn.disabled = true;
+		fetch('{{ url_for("containers_admin.api_notification_test") }}', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'CSRF-Token': '{{ Session.nonce }}'
+			},
+			body: JSON.stringify({ type: type, url: url })
+		})
+		.then(r => r.json())
+		.then(data => {
+			if (data.success) {
+				alert('Test sent successfully! Check your Discord.');
+			} else {
+				alert('Failed: ' + (data.error || 'Unknown error'));
+			}
+		})
+		.catch(e => alert('Network error: ' + e))
+		.finally(() => {
+			btn.innerHTML = originalText;
+			btn.disabled = false;
+		});
+	}
+</script>
 {% endblock %}

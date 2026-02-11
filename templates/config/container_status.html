@@ -1,12 +1,80 @@
-<div class="tab-pane fade show active" id="docker" role="tabpanel" aria-autocomplete="none">
-    <h5>Status</h5>
-    <small class="form-text text-muted">
-        Status of communication with Docker service :
-        {% if connected %}
-        <b><span style="color:green">reachable</span></b>
-        {% else %}
-        <b><span style="color:red">unreachable</span></b>
-        {% endif %}
-    </small><br>
-
+<div class="mt-4">
+    <div class="card border shadow-sm">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-md-6 mb-3 mb-md-0">
+                    <div class="d-flex align-items-center">
+                        <div class="mr-3">
+                            {% if connected %}
+                            <div class="status-indicator status-online"></div>
+                            {% else %}
+                            <div class="status-indicator status-offline"></div>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <small class="text-muted d-block mb-1">Docker Connection</small>
+                            <strong class="{% if connected %}text-success{% else %}text-danger{% endif %}">
+                                {% if connected %}
+                                <i class="fas fa-check-circle"></i> Connected
+                                {% else %}
+                                <i class="fas fa-times-circle"></i> Disconnected
+                                {% endif %}
+                            </strong>
+                        </div>
+                    </div>
+                </div>
+                {% if docker_info %}
+                <div class="col-md-6">
+                    <div class="d-flex flex-wrap align-items-center gap-3">
+                        <div>
+                            <small class="text-muted d-block mb-1">Docker Version</small>
+                            <strong class="text-dark">{{ docker_info.version }}</strong>
+                        </div>
+                        {% if docker_info.containers_running is defined %}
+                        <div>
+                            <small class="text-muted d-block mb-1">Running Containers</small>
+                            <strong class="text-primary">{{ docker_info.containers_running }}</strong>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
 </div>
+
+<style>
+    .status-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+    }
+    
+    .status-indicator.status-online {
+        background: 28a745;
+        box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+    }
+    
+    .status-indicator.status-offline {
+        background: dc3545;
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+    }
+    
+    @keyframes pulse {
+        0% {
+            box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+        }
+        70% {
+            box-shadow: 0 0 0 10px rgba(40, 167, 69, 0);
+        }
+        100% {
+            box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+        }
+    }
+    
+    .gap-3 {
+        gap: 1rem;
+    }
+</style>

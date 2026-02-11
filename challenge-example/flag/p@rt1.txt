@@ -1,0 +1,1 @@
+FLAG{part1_placeholder}

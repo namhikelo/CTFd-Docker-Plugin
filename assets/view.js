@@ -1,12 +1,12 @@
 CTFd._internal.challenge.data = undefined;
 CTFd._internal.challenge.renderer = null;
-CTFd._internal.challenge.preRender = function () {};
+CTFd._internal.challenge.preRender = function () { };
 CTFd._internal.challenge.render = null;
-CTFd._internal.challenge.postRender = function () {};
+CTFd._internal.challenge.postRender = function () { };
 
 CTFd._internal.challenge.submit = function (preview) {
     var challenge_id = parseInt(CTFd.lib.$("#challenge-id").val());
-    var submission = CTFd.lib.$("#challenge-input").val();
+    var submission = CTFd.lib.$("#challenge-input").val().trim();
 
     let alert = resetAlert();
 
@@ -57,56 +57,61 @@ function enableButtons() {
 }
 
 function toggleChallengeCreate() {
-    document.getElementById("create-chal").classList.toggle('d-none');
+    const btn = document.getElementById("create-chal");
+    if (btn) {
+        btn.classList.remove('d-none');
+    }
 }
 
-function toggleChallengeUpdate(isInfinite, removeTerminate = false) {
+function hideChallengeCreate() {
+    const btn = document.getElementById("create-chal");
+    if (btn) {
+        btn.classList.add('d-none');
+    }
+}
+
+function toggleChallengeUpdate() {
     const extendBtn = document.getElementById("extend-chal");
     const terminateBtn = document.getElementById("terminate-chal");
-    if (removeTerminate) {
-        terminateBtn.classList.add('d-none');
-    }
-    else{
-        terminateBtn.classList.remove('d-none');
-    }
-    
-    if (isInfinite) {
-        extendBtn.classList.add('d-none');
-    } else {
-        extendBtn.classList.remove('d-none');
-    }
+    if (extendBtn) extendBtn.classList.remove('d-none');
+    if (terminateBtn) terminateBtn.classList.remove('d-none');
+}
+
+function hideChallengeUpdate() {
+    const extendBtn = document.getElementById("extend-chal");
+    const terminateBtn = document.getElementById("terminate-chal");
+    if (extendBtn) extendBtn.classList.add('d-none');
+    if (terminateBtn) terminateBtn.classList.add('d-none');
 }
 
 function calculateExpiry(date) {
-    return Math.ceil((new Date(date * 1000) - new Date()) / 1000 / 60);;
+    return Math.ceil((new Date(date * 1000) - new Date()) / 1000 / 60);
+}
+
+function formatExpiry(timestampMs) {
+    const secondsLeft = Math.ceil((timestampMs - Date.now()) / 1000);
+    if (secondsLeft < 0) {
+        return "Expired";
+    } else if (secondsLeft < 60) {
+        return "Expires in " + secondsLeft + " seconds";
+    } else {
+        const minutesLeft = Math.ceil(secondsLeft / 60);
+        return "Expires in " + minutesLeft + " minutes";
+    }
 }
 
 function createChallengeLinkElement(data, parent) {
     parent.innerHTML = "";
 
     let expires = document.createElement('span');
-    if(data.container_expiration != 0){
-        expires.textContent = "Expires in " + calculateExpiry(new Date(data.expires)) + " minutes.";
-        parent.append(expires, document.createElement('br'));
-    }else{
-        expires.textContent = "No expiration instance limit.";
-        parent.append(expires, document.createElement('br'));
-    }
+    expires.textContent = formatExpiry(data.expires_at);
+    parent.append(expires, document.createElement('br'));
 
     if (data.connect == "tcp") {
         let codeElement = document.createElement('code');
         codeElement.textContent = 'nc ' + data.hostname + " " + data.port;
         parent.append(codeElement);
-    }else if(data.connect == 'ssh'){
-        let ssh = document.createElement('code');
-        ssh.textContent = 'ssh ' + data.username + "@" + data.hostname + ' -p '  + data.port;
-        let passwordDisplay = document.createElement('code');
-        passwordDisplay.textContent = 'Password: ' + data.password;
-        parent.append(ssh)
-        parent.append(document.createElement('br'));
-        parent.append(passwordDisplay);
-    }
-     else {
+    } else {
         let link = document.createElement('a');
         link.href = 'http://' + data.hostname + ":" + data.port;
         link.textContent = 'http://' + data.hostname + ":" + data.port;
@@ -115,148 +120,425 @@ function createChallengeLinkElement(data, parent) {
     }
 }
 
-
 function view_container_info(challenge_id) {
+    // console.log("[Container] Fetching info for challenge", challenge_id);
     let alert = resetAlert();
 
-    fetch("/containers/api/view_info", {
-        method: "POST",
+    fetch("/api/v1/containers/info/" + challenge_id, {
+        method: "GET",
         headers: {
-            "Content-Type": "application/json",
             "Accept": "application/json",
             "CSRF-Token": init.csrfNonce
-        },
-        body: JSON.stringify({ chal_id: challenge_id })
-    })
-    .then(response => response.json())
-    .then(data => {
-        alert.innerHTML = "";
-        if (data.status == "Challenge not started") {
-            alert.innerHTML = data.status;
-            toggleChallengeCreate();
-        } else if (data.status == "already_running") {
-            isInfinite = data.container_expiration == 0;
-            createChallengeLinkElement(data, alert);
-            toggleChallengeUpdate(isInfinite);
-        } else {
-            alert.innerHTML = data.message;
-            alert.classList.add("alert-danger");
-            isInfinite = data.container_expiration == 0;
-            toggleChallengeUpdate(isInfinite);
         }
     })
-    .catch(error => {
-        alert.innerHTML = "Error fetching container info.";
-        alert.classList.add("alert-danger");
-        console.error("Fetch error:", error);
-    })
-    .finally(enableButtons);
+        .then(response => response.json())
+        .then(data => {
+            // console.log("[Container] Info response:", data);
+            alert.innerHTML = ""; // Remove spinner
+
+            if (data.status == "not_found") {
+                alert.innerHTML = "No active instance. Click 'Fetch Instance' to start.";
+                hideChallengeUpdate();
+                toggleChallengeCreate();
+            } else if (data.status == "running" || data.status == "provisioning") {
+                // Show connection info
+                let expires = document.createElement('span');
+                expires.textContent = formatExpiry(data.expires_at);
+                alert.append(expires, document.createElement('br'));
+
+                // Display connection info based on type
+                renderConnectionInfo(data.connection, alert);
+                hideChallengeCreate();
+                toggleChallengeUpdate();
+            } else {
+                // SECURITY: Use textContent to prevent XSS from server data
+                alert.textContent = data.error || "Unknown status";
+                alert.classList.add("alert-danger");
+                hideChallengeUpdate();
+                toggleChallengeCreate();
+            }
+        })
+        .catch(error => {
+            console.error("[Container] Fetch error:", error);
+            alert.textContent = "Error fetching container info.";
+            alert.classList.add("alert-danger");
+            toggleChallengeCreate();
+        })
+        .finally(enableButtons);
 }
 
 function container_request(challenge_id) {
     let alert = resetAlert();
 
-    fetch("/containers/api/request", {
+    fetch("/api/v1/containers/request", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
             "Accept": "application/json",
             "CSRF-Token": init.csrfNonce
         },
-        body: JSON.stringify({ chal_id: challenge_id })
+        body: JSON.stringify({ challenge_id: challenge_id })
     })
-    .then(response => response.json())
-    .then(data => {
-        alert.innerHTML = ""; // Remove spinner
-        if (data.error) {
-            alert.innerHTML = data.error;
+        .then(response => response.json())
+        .then(data => {
+            alert.innerHTML = ""; // Remove spinner
+            if (data.error) {
+                // SECURITY: Use textContent to prevent XSS from server data
+                alert.textContent = data.error;
+                alert.classList.add("alert-danger");
+                toggleChallengeCreate();
+            } else {
+                // Show connection info
+                let expires = document.createElement('span');
+                expires.textContent = formatExpiry(data.expires_at);
+                alert.append(expires, document.createElement('br'));
+
+                // Display connection info based on type
+                renderConnectionInfo(data.connection, alert);
+                hideChallengeCreate();
+                toggleChallengeUpdate();
+            }
+        })
+        .catch(error => {
+            console.error("[Container] Request error:", error);
+            alert.textContent = "Error requesting container.";
             alert.classList.add("alert-danger");
-            toggleChallengeCreate();
-        } else if (data.message) {
-            alert.innerHTML = data.message;
-            alert.classList.add("alert-danger");
-            toggleChallengeCreate();
-        } else {
-            createChallengeLinkElement(data, alert);
-            isInfinite = data.container_expiration == 0;
-            toggleChallengeUpdate(isInfinite);
-            toggleChallengeCreate();
-        }
-    })
-    .catch(error => {
-        alert.innerHTML = "Error requesting container.";
-        alert.classList.add("alert-danger");
-        console.error("Fetch error:", error);
-    })
-    .finally(enableButtons);
+        })
+        .finally(enableButtons);
 }
 
 function container_renew(challenge_id) {
     let alert = resetAlert();
 
-    fetch("/containers/api/renew", {
+    fetch("/api/v1/containers/renew", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
             "Accept": "application/json",
             "CSRF-Token": init.csrfNonce
         },
-        body: JSON.stringify({ chal_id: challenge_id })
+        body: JSON.stringify({ challenge_id: challenge_id })
     })
-    .then(response => response.json())
-    .then(data => {
-        alert.innerHTML = ""; // Remove spinner
-        if (data.error) {
-            alert.innerHTML = data.error;
+        .then(response => response.json())
+        .then(data => {
+            alert.innerHTML = ""; // Remove spinner
+            if (data.error) {
+                // SECURITY: Use textContent to prevent XSS from server data
+                alert.textContent = data.error;
+                alert.classList.add("alert-danger");
+            } else {
+                // Fetch updated info
+                view_container_info(challenge_id);
+            }
+        })
+        .catch(error => {
+            alert.textContent = "Error renewing container.";
             alert.classList.add("alert-danger");
-        } else if (data.message) {
-            alert.innerHTML = data.message;
-            alert.classList.add("alert-danger");
-        } else {
-            createChallengeLinkElement(data, alert);
-        }
-    })
-    .catch(error => {
-        alert.innerHTML = "Error renewing container.";
-        alert.classList.add("alert-danger");
-        console.error("Fetch error:", error);
-    })
-    .finally(enableButtons);
+            console.error("Fetch error:", error);
+        })
+        .finally(enableButtons);
 }
 
 function container_stop(challenge_id) {
     let alert = resetAlert();
 
-    fetch("/containers/api/stop", {
+    fetch("/api/v1/containers/stop", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
             "Accept": "application/json",
             "CSRF-Token": init.csrfNonce
         },
-        body: JSON.stringify({ chal_id: challenge_id })
+        body: JSON.stringify({ challenge_id: challenge_id })
     })
-    .then(response => response.json())
-    .then(data => {
-        alert.innerHTML = "";
-        if (data.error) {
-            alert.innerHTML = data.error;
+        .then(response => response.json())
+        .then(data => {
+            alert.innerHTML = ""; // Remove spinner
+            if (data.error) {
+                // SECURITY: Use textContent to prevent XSS from server data
+                alert.textContent = data.error;
+                alert.classList.add("alert-danger");
+            } else {
+                alert.textContent = "Instance terminated successfully.";
+                hideChallengeUpdate();
+                toggleChallengeCreate();
+            }
+        })
+        .catch(error => {
+            console.error("[Container] Stop error:", error);
+            alert.textContent = "Error stopping container.";
             alert.classList.add("alert-danger");
-            toggleChallengeCreate();
-        } else if (data.message) {
-            alert.innerHTML = data.message;
-            alert.classList.add("alert-danger");
-            toggleChallengeCreate();
-        } else {
-            alert.innerHTML = "Challenge Terminated.";
-            toggleChallengeCreate();
-            toggleChallengeUpdate(true, true);
+        })
+        .finally(enableButtons);
+}
+
+// Initialize: Inject UI elements if template doesn't load
+(function () {
+    // console.log("[Container] Initializing - checking for template render");
+
+    let checkCount = 0;
+    const maxChecks = 20;
+
+    function checkAndInject() {
+        checkCount++;
+        // console.log(`[Container] Check #${checkCount}: Looking for deployment-actions or challenge window`);
+
+        // First check if our template loaded
+        let deploymentDiv = document.querySelector('.deployment-actions');
+        if (deploymentDiv) {
+            const challengeId = deploymentDiv.getAttribute('data-challenge-id');
+            if (challengeId) {
+                // console.log("[Container] Template loaded! Challenge ID:", challengeId);
+                view_container_info(parseInt(challengeId));
+                return true;
+            }
         }
-    })
-    .catch(error => {
-        alert.innerHTML = "Error stopping container.";
-        alert.classList.add("alert-danger");
-        console.error("Fetch error:", error);
-    })
-    .finally(enableButtons);
+
+        // If template didn't load, inject UI manually
+        const challengeWindow = document.getElementById('challenge-window');
+        // Support both core theme (.modal-body) and modern theme (.challenge-modal-body)
+        const challengeBody = challengeWindow
+            ? (challengeWindow.querySelector('.challenge-modal-body') || challengeWindow.querySelector('.modal-body'))
+            : null;
+
+        if (challengeBody && !document.querySelector('.deployment-actions-injected')) {
+            // console.log("[Container] Template NOT loaded, injecting UI manually");
+
+            // Try multiple ways to get challenge ID
+            let challengeId = null;
+
+            // Method 1: From window.challenge
+            if (window.challenge?.data?.id) {
+                challengeId = window.challenge.data.id;
+                // console.log("[Container] Got challenge ID from window.challenge:", challengeId);
+            }
+
+            // Method 2: From CTFd internal store
+            if (!challengeId && window.CTFd?._internal?.challenge?.data?.id) {
+                challengeId = window.CTFd._internal.challenge.data.id;
+                // console.log("[Container] Got challenge ID from CTFd._internal:", challengeId);
+            }
+
+            // Method 3: From challenge-id input field
+            if (!challengeId) {
+                const challengeIdInput = document.getElementById('challenge-id');
+                if (challengeIdInput) {
+                    challengeId = parseInt(challengeIdInput.value);
+                    // console.log("[Container] Got challenge ID from input field:", challengeId);
+                }
+            }
+
+            // Method 4: From modal title or data attributes
+            if (!challengeId && challengeWindow) {
+                const titleElement = challengeWindow.querySelector('[data-challenge-id]');
+                if (titleElement) {
+                    challengeId = parseInt(titleElement.getAttribute('data-challenge-id'));
+                    // console.log("[Container] Got challenge ID from data attribute:", challengeId);
+                }
+            }
+
+            if (!challengeId) {
+                console.warn("[Container] Cannot get challenge ID, available data:", {
+                    'window.challenge': window.challenge,
+                    'CTFd._internal.challenge': window.CTFd?._internal?.challenge,
+                    'challenge-id input': document.getElementById('challenge-id')?.value
+                });
+                return false;
+            }
+
+            // console.log("[Container] Using challenge ID:", challengeId);
+
+            // Create container UI
+            // Use theme-compatible styling: detect modern theme by presence of .challenge-modal
+            const isModernTheme = !!challengeWindow.querySelector('.challenge-modal');
+            const containerDiv = document.createElement('div');
+            containerDiv.className = 'mb-3 text-center deployment-actions-injected';
+
+            if (isModernTheme) {
+                // Modern theme: use its design language
+                containerDiv.innerHTML = `
+                    <div class="challenge-connection" style="margin-bottom:16px;">
+                        <div class="connection-label">
+                            <i class="fas fa-server"></i>
+                            <span>Instance</span>
+                        </div>
+                        <div class="connection-value" id="deployment-info" style="text-align:center;padding:8px 0;">
+                            <div class="spinner-border spinner-border-sm" role="status" style="color:var(--modal-accent,#20c997)">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+                        <button onclick="container_request(${challengeId})" class="d-none" id="create-chal"
+                            style="padding:10px 20px;background:var(--modal-accent,#20c997);border:none;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:0.8rem;font-weight:600;color:#000;cursor:pointer;">
+                            Fetch Instance
+                        </button>
+                        <button onclick="container_renew(${challengeId})" class="d-none" id="extend-chal"
+                            style="padding:10px 20px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:0.8rem;font-weight:600;color:#e8e8e8;cursor:pointer;">
+                            Extend Time
+                        </button>
+                        <button onclick="container_stop(${challengeId})" class="d-none" id="terminate-chal"
+                            style="padding:10px 20px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:0.8rem;font-weight:600;color:#ef4444;cursor:pointer;">
+                            Terminate
+                        </button>
+                    </div>
+                `;
+            } else {
+                // Core theme: use Bootstrap classes
+                containerDiv.innerHTML = `
+                    <div class="alert alert-primary" id="deployment-info">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    <span>
+                        <button onclick="container_request(${challengeId})" class="btn btn-primary d-none" id="create-chal">
+                            <small style="color: white"> Fetch Instance </small>
+                        </button>
+                        <button onclick="container_renew(${challengeId})" class="btn btn-info d-none" id="extend-chal">
+                            <small style="color: white"> Extend Time </small>
+                        </button>
+                        <button onclick="container_stop(${challengeId})" class="btn btn-danger d-none" id="terminate-chal">
+                            <small style="color: white"> Terminate </small>
+                        </button>
+                    </span>
+                `;
+            }
+
+            // Insert after challenge description
+            // Support both core theme (.challenge-desc) and modern theme (.challenge-description)
+            const descSection = challengeBody.querySelector('.challenge-desc') || challengeBody.querySelector('.challenge-description');
+            if (descSection) {
+                descSection.after(containerDiv);
+                // console.log("[Container] UI injected, calling view_container_info");
+                view_container_info(challengeId);
+                return true;
+            } else {
+                challengeBody.insertBefore(containerDiv, challengeBody.firstChild);
+                // console.log("[Container] UI injected at top, calling view_container_info");
+                view_container_info(challengeId);
+                return true;
+            }
+        }
+
+        if (checkCount >= maxChecks) {
+            console.error("[Container] Max checks reached, giving up");
+            return true; // Stop checking
+        }
+
+        return false;
+    }
+
+    // Try immediately
+    if (checkAndInject()) return;
+
+    // Watch for changes
+    const observer = new MutationObserver(function (mutations) {
+        if (checkAndInject()) {
+            observer.disconnect();
+        }
+    });
+
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+
+    // console.log("[Container] MutationObserver started");
+})();
+
+function renderConnectionInfo(connection, parent) {
+    // Prioritize URL List (Multi-port Subdomain)
+    if (connection.type == "url_list" && connection.urls) {
+        connection.urls.forEach(function (item) {
+            let link = document.createElement('a');
+            link.href = item.url;
+            link.textContent = item.url;
+            link.target = '_blank';
+            parent.append(link, document.createElement('br'));
+        });
+        return; // Stop here if handled
+    }
+
+    if (connection.ports && Object.keys(connection.ports).length > 0) {
+        // Multi-port logic (Host:Port fallback)
+        if (connection.type == "tcp" || connection.type == "nc") {
+            let ports = Object.values(connection.ports).join(', ');
+            let code = document.createElement('code');
+            code.textContent = 'nc ' + connection.host + " " + ports;
+            parent.append(code);
+        } else if (connection.type == "http" || connection.type == "web") {
+            for (let internal in connection.ports) {
+                let external = connection.ports[internal];
+                let link = document.createElement('a');
+                link.href = 'http://' + connection.host + ":" + external;
+                link.textContent = 'http://' + connection.host + ":" + external;
+                link.target = '_blank';
+                parent.append(link, document.createElement('br'));
+            }
+        } else if (connection.type == "ssh") {
+            for (let internal in connection.ports) {
+                let external = connection.ports[internal];
+                let code = document.createElement('code');
+                code.textContent = 'ssh -p ' + external + ' user@' + connection.host;
+                parent.append(code, document.createElement('br'));
+            }
+        } else {
+            // Default/Custom
+            for (let internal in connection.ports) {
+                let external = connection.ports[internal];
+                let code = document.createElement('code');
+                code.textContent = connection.host + ":" + external;
+                parent.append(code, document.createElement('br'));
+            }
+        }
+    } else {
+        // Legacy single port
+        if (connection.type == "tcp" || connection.type == "nc") {
+            let codeElement = document.createElement('code');
+            codeElement.textContent = 'nc ' + connection.host + " " + connection.port;
+            parent.append(codeElement);
+        } else if (connection.type == "ssh") {
+            let codeElement = document.createElement('code');
+            codeElement.textContent = 'ssh -p ' + connection.port + ' user@' + connection.host;
+            parent.append(codeElement);
+        } else if (connection.type == "url") {
+            let link = document.createElement('a');
+            let url = connection.url || ('https://' + connection.host);
+            link.href = url;
+            link.textContent = url;
+            link.target = '_blank';
+            parent.append(link);
+        } else if (connection.type == "http" || connection.type == "web") {
+            let link = document.createElement('a');
+            link.href = 'http://' + connection.host + ":" + connection.port;
+            link.textContent = 'http://' + connection.host + ":" + connection.port;
+            link.target = '_blank';
+            parent.append(link);
+        } else if (connection.type == "https") {
+            let link = document.createElement('a');
+            link.href = 'https://' + connection.host;
+            link.textContent = 'https://' + connection.host;
+            link.target = '_blank';
+            parent.append(link);
+        } else if (connection.type == "url_list") {
+            // Redundant fallback (should be handled above), but kept for safety if .urls is empty
+            // Just show generic host
+            let codeElement = document.createElement('code');
+            codeElement.textContent = connection.host;
+            parent.append(codeElement);
+        } else {
+            let codeElement = document.createElement('code');
+            codeElement.textContent = connection.host + ":" + connection.port;
+            parent.append(codeElement);
+        }
+    }
+
+    // Append info text if available
+    if (connection.info) {
+        if (parent.lastChild.tagName != 'BR') parent.append(document.createElement('br'));
+        let info = document.createElement('small');
+        info.textContent = connection.info;
+        parent.append(info);
+    }
 }

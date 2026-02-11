@@ -1,29 +1,14 @@
 {% extends "container_base.html" %}
 
 {% block menu %}
-<li class="nav-item">
-	<a class="nav-link active" href="#">
-		<i class="fas fa-server me-2"></i>Instances
-	</a>
-</li>
-<li class="nav-item">
-	<a class="nav-link" href="/containers/admin/settings">
-		<i class="fas fa-cog me-2"></i>Settings
-	</a>
-</li>
-<li class="nav-item">
-	<a class="nav-link" href="/containers/admin/cheat">
-		<i class="fas fa-share-alt me-2"></i>Share Flag
-	</a>
-</li>
+{% include "config/container_menu.html" %}
 {% endblock %}
 
 {% block panel %}
-<!-- Header Section -->
 <div class="d-flex justify-content-between align-items-center mb-4">
 	<div>
 		<h2 class="h4 mb-1 text-dark">
-			<i class="fas fa-server text-primary me-2"></i>Container Instances
+			<i class="fas fa-server text-primary me-3"></i>Container Instances
 		</h2>
 		<p class="text-muted mb-0">Manage running container instances and their configurations</p>
 	</div>
@@ -31,28 +16,33 @@
 		<button type="button" class="btn btn-outline-danger btn-sm" 
 				data-bs-toggle="tooltip" data-bs-placement="top" 
 				title="Delete selected containers" 
-				id="instances-delete-button"
 				onclick="bulkDeleteContainers()">
-			<i class="fas fa-trash-alt me-1"></i>
+			<i class="fas fa-trash-alt me-2"></i>
 			<span class="d-none d-md-inline">Delete Selected</span>
 		</button>
 		<button type="button" class="btn btn-outline-primary btn-sm" 
 				onclick="refreshData()">
-			<i class="fas fa-sync-alt me-1"></i>
+			<i class="fas fa-sync-alt me-2"></i>
 			<span class="d-none d-md-inline">Refresh</span>
+		</button>
+		<button type="button" class="btn btn-danger btn-sm" 
+				onclick="emergencyStop()">
+			<i class="fas fa-power-off me-2"></i>
+			<span class="d-none d-md-inline">Emergency Stop</span>
 		</button>
 	</div>
 </div>
 
-<div class="row mb-3 justify-content-center">
+<!-- Stats Cards -->
+<div class="row mb-4 justify-content-center">
 	<div class="col-md-3 col-sm-6 mb-3">
 		<div class="card border-0 shadow-sm h-100">
 			<div class="card-body text-center">
 				<div class="d-flex align-items-center justify-content-center mb-2">
-					<i class="fas fa-server text-primary fs-4" style="margin-right: 1rem;"></i>
-					<span class="h3 mb-0 text-dark" id="total-containers">{{ total_container_challenges if total_container_challenges else 0 }}</span>
+					<i class="fas fa-list text-primary fs-4 me-3"></i>
+					<span class="h3 mb-0 text-dark" id="total-instances">{{ total_count if total_count else 0 }}</span>
 				</div>
-				<p class="text-muted mb-0 small">Total Challenges Containers</p>
+				<p class="text-muted mb-0 small">Total Instances</p>
 			</div>
 		</div>
 	</div>
@@ -60,25 +50,75 @@
 		<div class="card border-0 shadow-sm h-100">
 			<div class="card-body text-center">
 				<div class="d-flex align-items-center justify-content-center mb-2">
-					<i class="fas fa-server text-primary fs-4" style="margin-right: 1rem;"></i>
-
-					<span class="h3 mb-0 text-dark" id="running-containers">{{ containers|length if containers else 0 }}</span>
+					<i class="fas fa-play-circle text-success fs-4 me-3"></i>
+					<span class="h3 mb-0 text-dark" id="running-instances">{{ running_count if running_count else 0 }}</span>
 				</div>
 				<p class="text-muted mb-0 small">Running Containers</p>
 			</div>
 		</div>
 	</div>
-
 	<div class="col-md-3 col-sm-6 mb-3">
 		<div class="card border-0 shadow-sm h-100">
 			<div class="card-body text-center">
 				<div class="d-flex align-items-center justify-content-center mb-2">
-					<i class="fas fa-play-circle text-success fs-4" style="margin-right: 1rem;"></i>
-					<span class="h3 mb-0 text-dark" id="unique-challenges">{{ unique_spawned_challenges if unique_spawned_challenges else 0 }}</span>
+					<i class="fas fa-puzzle-piece text-info fs-4 me-3"></i>
+					<span class="h3 mb-0 text-dark" id="unique-challenges">{{ all_challenges|length if all_challenges else 0 }}</span>
 				</div>
-				<p class="text-muted mb-0 small">Unique Running Challenges</p>
+				<p class="text-muted mb-0 small">Total Challenges</p>
 			</div>
 		</div>
+	</div>
+</div>
+
+<!-- Filter Section -->
+<div class="card border-0 shadow-sm mb-4">
+	<div class="card-body">
+		<form method="GET" class="row g-3 align-items-end">
+			<div class="col-lg-3 col-md-4">
+				<label class="form-label small text-muted fw-bold mb-1">SEARCH</label>
+				<input type="text" name="q" class="form-control" placeholder="Search Team/User" value="{{ filters.q if filters.q else '' }}">
+			</div>
+			<div class="col-lg-3 col-md-4">
+				<label class="form-label small text-muted fw-bold mb-1">CHALLENGE</label>
+				<div class="dropdown" id="challenge-dropdown">
+					<button class="btn btn-outline-secondary dropdown-toggle w-100 text-start d-flex justify-content-between align-items-center" 
+							type="button" id="challengeDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false">
+						<span id="selected-challenge-text">All Challenges</span>
+					</button>
+					<div class="dropdown-menu w-100 p-0 shadow-sm" aria-labelledby="challengeDropdownBtn" style="max-height: 300px; overflow-y: auto;">
+						<div class="p-2 sticky-top bg-white border-bottom">
+							<input type="text" class="form-control form-control-sm" id="challenge-search-input" placeholder="Type to filter..." autocomplete="off">
+						</div>
+						<div id="challenge-list-container">
+							<a class="dropdown-item challenge-item" href="" data-value="">All Challenges</a>
+							{% for c in all_challenges %}
+							<a class="dropdown-item challenge-item" href="" data-value="{{ c.id }}">{{ c.name }}</a>
+							{% endfor %}
+						</div>
+					</div>
+					<input type="hidden" name="challenge_id" id="challenge_id_hidden" value="{{ filters.challenge_id if filters.challenge_id else '' }}">
+				</div>
+			</div>
+			<div class="col-lg-2 col-md-4">
+				<label class="form-label small text-muted fw-bold mb-1">STATUS</label>
+				<select name="status" class="form-select">
+					<option value="" {{ 'selected' if not filters.status or filters.status=='' }}>All Statuses</option>
+					<option value="running" {{ 'selected' if filters.status=='running' }}>Running</option>
+					<option value="provisioning" {{ 'selected' if filters.status=='provisioning' }}>Provisioning</option>
+					<option value="solved" {{ 'selected' if filters.status=='solved' }}>Solved</option>
+					<option value="error" {{ 'selected' if filters.status=='error' }}>Error</option>
+					<option value="stopped" {{ 'selected' if filters.status=='stopped' }}>Stopped</option>
+				</select>
+			</div>
+			<div class="col-auto">
+				<button type="submit" class="btn btn-primary">
+					<i class="fas fa-filter me-2"></i> Filter
+				</button>
+				<a href="{{ url_for('containers_admin.dashboard') }}" class="btn btn-outline-secondary ms-2">
+					Clear
+				</a>
+			</div>
+		</form>
 	</div>
 </div>
 
@@ -87,7 +127,7 @@
 	<div class="card-header bg-white border-bottom">
 		<div class="d-flex justify-content-between align-items-center">
 			<h5 class="mb-0 text-dark">
-				<i class="fas fa-list me-2"></i>Container List
+				<i class="fas fa-list me-3"></i>Container List
 			</h5>
 		</div>
 	</div>
@@ -98,103 +138,127 @@
 					<tr>
 						<th class="border-0 align-middle" style="width: 40px;">
 							<div class="form-check d-flex align-items-center justify-content-center m-0">
-								<input type="checkbox" class="form-check-input" data-checkbox-all>
+								<input type="checkbox" class="form-check-input" id="select-all">
 							</div>
 						</th>
 						<th class="border-0 text-dark fw-semibold">
-							<i class="fas fa-puzzle-piece me-1"></i>Challenge
+							<i class="fas fa-puzzle-piece me-2"></i>Challenge
 						</th>
 						<th class="border-0 text-dark fw-semibold d-none d-lg-table-cell">
-							<i class="fas fa-hashtag me-1"></i>Container ID
+							<i class="fas fa-hashtag me-2"></i>Container ID
 						</th>
 						<th class="border-0 text-dark fw-semibold">
-							<i class="fas fa-user me-1"></i>Owner
+							<i class="fas fa-user me-2"></i>Owner
+						</th>
+						<th class="border-0 text-dark fw-semibold text-center">
+							<i class="fas fa-info-circle me-2"></i>Status
 						</th>
 						<th class="border-0 text-dark fw-semibold d-none d-md-table-cell">
-							<i class="fas fa-flag me-1"></i>Flag
+							<i class="fas fa-clock me-2"></i>Time
 						</th>
-						<th class="border-0 text-dark fw-semibold d-none d-lg-table-cell">
-							<i class="fas fa-clock me-1"></i>Created
-						</th>
-						<th class="border-0 text-dark fw-semibold d-none d-xl-table-cell">
-							<i class="fas fa-hourglass-end me-1"></i>Expires
-						</th>
-						<th class="border-0 text-dark fw-semibold">
-							<i class="fas fa-plug me-1"></i>Connection
+						<th class="border-0 text-dark fw-semibold text-center">
+							<i class="fas fa-plug me-2"></i>Ports
 						</th>
 						<th class="border-0 text-dark fw-semibold" style="width: 80px;">
-							<i class="fas fa-cog me-1"></i>Actions
+							<i class="fas fa-cog me-2"></i>Actions
 						</th>
 					</tr>
 				</thead>
 				<tbody>
-					{% if containers %}
-					{% for c in containers %}
+					{% if instances and instances.items|length > 0 %}
+					{% for instance in instances.items %}
 					<tr>
 						<td class="align-middle">
 							<div class="form-check d-flex align-items-center justify-content-center m-0">
-								<input type="checkbox" class="form-check-input container-checkbox" value="{{ c.container_id }}">
+								<input type="checkbox" class="form-check-input container-checkbox" value="{{ instance.id }}">
 							</div>
 						</td>
 						<td>
-							<a href="{{ url_for('admin.challenges_detail', challenge_id=c.challenge_id) }}" class="fw-semibold text-dark text-decoration-none">
-								{{ c.challenge.name }}
+							<a href="{{ url_for('admin.challenges_detail', challenge_id=instance.challenge_id) }}" class="fw-semibold text-dark text-decoration-none">
+								{{ instance.challenge.name }}
 							</a>
 						</td>
 						<td class="d-none d-lg-table-cell">
-							<code class="small bg-light px-2 py-1 rounded">{{ c.container_id[:12] }}</code>
+							<code class="small bg-light px-2 py-1 rounded">{{ instance.container_id[:12] if instance.container_id else 'N/A' }}</code>
 						</td>
 						<td>
 							<div class="d-flex align-items-center gap-2">
 								<i class="fas fa-user text-info fa-fw"></i>
-								{% if c.team == None %}
-									<a href="{{ url_for('admin.users_detail', user_id=c.user_id) }}" class="fw-semibold text-dark text-decoration-none">
-										{{ c.user.name }}
-									</a>
+								{% if is_teams_mode %}
+									{% set team = instance.account_id | get_team %}
+									{% if team %}
+										<a href="{{ url_for('admin.teams_detail', team_id=team.id) }}" class="fw-semibold text-dark text-decoration-none">
+											{{ team.name }}
+										</a>
+									{% else %}
+										<span class="text-muted small">Team {{ instance.account_id }}</span>
+									{% endif %}
 								{% else %}
-									<a href="{{ url_for('admin.teams_detail', team_id=c.team_id) }}" class="fw-semibold text-dark text-decoration-none">
-										{{ c.team.name }}
-									</a>
+									{% set user = instance.account_id | get_user %}
+									{% if user %}
+										<a href="{{ url_for('admin.users_detail', user_id=user.id) }}" class="fw-semibold text-dark text-decoration-none">
+											{{ user.name }}
+										</a>
+									{% else %}
+										<span class="text-muted small">User {{ instance.account_id }}</span>
+									{% endif %}
 								{% endif %}
 							</div>
 						</td>
+						<td class="text-center">
+							{% set badge_color = 'success' if instance.status == 'running' else 'warning' if instance.status == 'provisioning' else 'danger' if instance.status == 'error' else 'info' if instance.status == 'solved' else 'secondary' %}
+							{% set status_icons = {
+								'running': 'fa-circle',
+								'provisioning': 'fa-spinner fa-spin',
+								'error': 'fa-exclamation-circle',
+								'solved': 'fa-check-circle',
+								'stopped': 'fa-stop-circle'
+							} %}
+							<span class="badge bg-{{ badge_color }}">
+								<i class="fas {{ status_icons.get(instance.status, 'fa-circle') }} me-2"></i>
+								{{ instance.status | capitalize }}
+							</span>
+						</td>
 						<td class="d-none d-md-table-cell">
-							<code class="small bg-light px-2 py-1 rounded text-break">{{ c.flag }}</code>
-						</td>
-						<td class="d-none d-lg-table-cell">
-							<div class="timestamp small text-muted">{{ c.timestamp }}</div>
-						</td>
-						<td class="d-none d-xl-table-cell">
-							<div class="timestamp small text-muted">{{ c.expires }}</div>
-						</td>
-						<td>
-							<div class="d-flex align-items-center gap-2">
-								<i class="fas fa-plug text-success fa-fw"></i>
-								<span class="badge bg-success">{{ c.challenge.connection_type }}</span>
-								<code class="small bg-light px-2 py-1 rounded">{{ c.port }}</code>
+							<div class="small text-muted">
+								<div><i class="far fa-clock me-2"></i><span class="timestamp" data-ts="{{ instance.created_at.timestamp() }}">-</span></div>
+								<div class="mt-1"><i class="fas fa-hourglass-end me-2"></i><span class="timestamp" data-ts="{{ instance.expires_at.timestamp() }}">-</span></div>
 							</div>
+						</td>
+						<td class="text-center">
+							{% if instance.connection_ports and instance.connection_ports|length > 0 %}
+							<div class="d-flex flex-wrap justify-content-center gap-1">
+								{% for int_p, ext_p in instance.connection_ports.items() %}
+								<code class="small bg-light px-2 py-1 rounded">{{ int_p }}→{{ ext_p }}</code>
+								{% endfor %}
+							</div>
+							{% else %}
+							<span class="text-muted small">N/A</span>
+							{% endif %}
 						</td>
 						<td>
 							<div class="btn-group btn-group-sm" role="group">
+								{% if instance.status == 'running' or instance.status == 'provisioning' %}
 								<button class="btn btn-outline-danger" 
-										onclick="killContainer('{{ c.container_id }}')"
-										data-bs-toggle="tooltip" data-bs-placement="top" Container ID
+										onclick="deleteInstance({{ instance.id }})"
+										data-bs-toggle="tooltip" data-bs-placement="top" 
 										title="Destroy Container">
 									<i class="fas fa-trash-alt"></i>
 								</button>
-								<button class="btn btn-outline-primary" 
-										onclick="copyConnectionInfo('{{ c.container_id }}', '{{ c.port }}')"
+								{% else %}
+								<button class="btn btn-outline-secondary" disabled
 										data-bs-toggle="tooltip" data-bs-placement="top" 
-										title="Copy Connection Info">
-									<i class="fas fa-copy"></i>
+										title="Already stopped">
+									<i class="fas fa-ban"></i>
 								</button>
+								{% endif %}
 							</div>
 						</td>
 					</tr>
 					{% endfor %}
 					{% else %}
 					<tr>
-						<td colspan="9" class="text-center py-5">
+						<td colspan="8" class="text-center py-5">
 							<div class="text-muted">
 								<i class="fas fa-inbox fa-3x mb-3"></i>
 								<h5>No containers running</h5>
@@ -209,171 +273,152 @@
 	</div>
 </div>
 
-{% include "config/container_status.html" %}
+{% if instances.pages > 1 %}
+<div class="mt-4">
+	<ul class="pagination justify-content-center">
+		{% if instances.has_prev %}
+		<li class="page-item">
+			<a class="page-link" href="{{ url_for('containers_admin.dashboard', page=instances.prev_num, **filters) }}">
+				<i class="fas fa-chevron-left"></i>
+			</a>
+		</li>
+		{% endif %}
+		{% for page_num in instances.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+		{% if page_num %}
+		<li class="page-item {{ 'active' if page_num == instances.page }}">
+			<a class="page-link" href="{{ url_for('containers_admin.dashboard', page=page_num, **filters) }}">{{ page_num }}</a>
+		</li>
+		{% else %}
+		<li class="page-item disabled"><span class="page-link">...</span></li>
+		{% endif %}
+		{% endfor %}
+		{% if instances.has_next %}
+		<li class="page-item">
+			<a class="page-link" href="{{ url_for('containers_admin.dashboard', page=instances.next_num, **filters) }}">
+				<i class="fas fa-chevron-right"></i>
+			</a>
+		</li>
+		{% endif %}
+	</ul>
+</div>
+{% endif %}
 
+{% include "config/container_status.html" %}
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-
-	const observer = new MutationObserver(() => {
-		convertToGMT7();
-	});
-
-	observer.observe(document.body, {
-		childList: true,
-		subtree: true
-	});
-
-
-
 	document.addEventListener("DOMContentLoaded", function () {
+		// Tooltips
 		var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
 		var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
 			return new bootstrap.Tooltip(tooltipTriggerEl);
 		});
 
-		
-		convertToGMT7();
-		updateStats();
-	});
-	function convertToGMT7() {
-		console.log("Converting timestamps...");
-		document.querySelectorAll(".timestamp").forEach(element => {
-			let originalTime = element.innerText.trim();
-			if (!originalTime || isNaN(originalTime)) return;
+		// Searchable Dropdown Logic
+		const searchInput = document.getElementById('challenge-search-input');
+		const challengeList = document.getElementById('challenge-list-container');
+		const hiddenInput = document.getElementById('challenge_id_hidden');
+		const selectedText = document.getElementById('selected-challenge-text');
+		const items = challengeList.getElementsByClassName('challenge-item');
 
-			let dateObj = new Date(parseInt(originalTime, 10) * 1000);
+		// Initial label set
+		const initialValue = hiddenInput.value;
+		if (initialValue) {
+			for (let item of items) {
+				if (item.dataset.value === initialValue) {
+					selectedText.innerText = item.innerText;
+					break;
+				}
+			}
+		}
 
-			let utc = dateObj.getTime() + (dateObj.getTimezoneOffset() * 60000);
-			let gmt7 = new Date(utc + (7 * 60 * 60 * 1000));
-
-			let day = String(gmt7.getDate()).padStart(2, '0');
-			let month = String(gmt7.getMonth() + 1).padStart(2, '0');
-			let year = gmt7.getFullYear();
-			let hours = String(gmt7.getHours()).padStart(2, '0');
-			let minutes = String(gmt7.getMinutes()).padStart(2, '0');
-			let seconds = String(gmt7.getSeconds()).padStart(2, '0');
-
-			let formatted = `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
-			element.innerText = formatted;
+		searchInput.addEventListener('keyup', function () {
+			const filter = searchInput.value.toLowerCase();
+			for (let item of items) {
+				const text = item.innerText.toLowerCase();
+				item.style.display = text.includes(filter) ? "" : "none";
+			}
 		});
-	}
-	
-	function updateStats() {
-		const runningCount = document.querySelectorAll('tr').length - 1;
-		document.getElementById('running-containers').textContent = runningCount;
-		
-		const userLinks = document.querySelectorAll('td:nth-child(4) a');
-		const uniqueUsers = new Set();
-		userLinks.forEach(link => uniqueUsers.add(link.textContent.trim()));
-		document.getElementById('unique-users').textContent = uniqueUsers.size;
-		
-		// Update unique challenges count
-		const challengeLinks = document.querySelectorAll('td:nth-child(2) a');
-		const uniqueChallenges = new Set();
-		challengeLinks.forEach(link => uniqueChallenges.add(link.textContent.trim()));
-		document.getElementById('unique-challenges').textContent = uniqueChallenges.size;
-	}
+
+		// Handle Selection
+		challengeList.addEventListener('click', function (e) {
+			if (e.target.classList.contains('challenge-item')) {
+				e.preventDefault();
+				const value = e.target.dataset.value;
+				const text = e.target.innerText;
+				hiddenInput.value = value;
+				selectedText.innerText = text;
+			}
+		});
+
+		// Prevent dropdown close when clicking input
+		searchInput.addEventListener('click', function (e) {
+			e.stopPropagation();
+		});
+
+		// Timestamp Formatting
+		function formatTimestamps() {
+			document.querySelectorAll(".timestamp").forEach(element => {
+				let ts = element.getAttribute("data-ts");
+				if (!ts || ts === "None") return;
+				let date = new Date(ts * 1000);
+				let hh = String(date.getHours()).padStart(2, '0');
+				let mm = String(date.getMinutes()).padStart(2, '0');
+				let d = String(date.getDate()).padStart(2, '0');
+				let m = String(date.getMonth() + 1).padStart(2, '0');
+				element.innerText = `${hh}:${mm} ${d}/${m}`;
+			});
+		}
+		formatTimestamps();
+
+		// Select All Logic
+		const selectAll = document.getElementById('select-all');
+		const checkboxes = document.querySelectorAll('.container-checkbox');
+		if (selectAll) {
+			selectAll.addEventListener('change', function () {
+				checkboxes.forEach(cb => cb.checked = selectAll.checked);
+			});
+		}
+	});
 
 	function refreshData() {
 		window.location.reload();
 	}
 
-	function copyConnectionInfo(id, port) {
-		const connectionString = `docker exec -it ${id} /bin/bash`;
-		navigator.clipboard.writeText(connectionString).then(() => {
-			const button = event.target.closest('button');
-			const originalIcon = button.innerHTML;
-			button.innerHTML = '<i class="fas fa-check"></i>';
-			button.classList.remove('btn-outline-primary');
-			button.classList.add('btn-success');
-			
-			setTimeout(() => {
-				button.innerHTML = originalIcon;
-				button.classList.remove('btn-success');
-				button.classList.add('btn-outline-primary');
-			}, 1000);
-		});
-	}
-
-	function killContainer(container_id) {
-		if (!confirm('Are you sure you want to destroy this container?')) {
-			return;
-		}
-
-		fetch("/containers/admin/api/kill", {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				"Accept": "application/json",
-				"CSRF-Token": init.csrfNonce,
-			},
-			body: JSON.stringify({ container_id: container_id }),
-		})
-		.then((response) => response.json())
-		.then((data) => {
-			if (data.success) {
-				showNotification('Container destroyed successfully', 'success');
-				setTimeout(() => window.location.reload(), 1000);
-			} else {
-				showNotification('Error destroying container: ' + (data.error || 'Unknown error'), 'error');
-			}
-		})
-		.catch((error) => {
-			console.error("Error:", error);
-			showNotification('Error destroying container', 'error');
+	function deleteInstance(instanceId) {
+		if (!confirm('Are you sure you want to terminate and delete this container?')) return;
+		fetch('{{ url_for("containers_admin.api_instances") }}/' + instanceId, {
+			method: 'DELETE',
+			headers: { 'Content-Type': 'application/json', 'CSRF-Token': init.csrfNonce }
+		}).then(r => r.json()).then(data => {
+			if (data.success) location.reload();
+			else alert('Error: ' + data.error);
 		});
 	}
 
 	function bulkDeleteContainers() {
-		let selectedContainers = [];
-		document.querySelectorAll(".container-checkbox:checked").forEach(checkbox => {
-			selectedContainers.push(checkbox.value);
-		});
-
-		if (selectedContainers.length === 0) {
-			showNotification('Please select at least one container to delete', 'warning');
-			return;
-		}
-
-		if (!confirm(`Are you sure you want to delete ${selectedContainers.length} container(s)?`)) {
-			return;
-		}
-
-		fetch("/containers/admin/api/purge", {
+		let selected = Array.from(document.querySelectorAll(".container-checkbox:checked")).map(cb => cb.value);
+		if (selected.length === 0) return alert("Select at least one container.");
+		if (!confirm(`Delete ${selected.length} items?`)) return;
+		fetch('{{ url_for("containers_admin.api_bulk_delete") }}', {
 			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				"Accept": "application/json",
-				"CSRF-Token": init.csrfNonce
-			},
-			body: JSON.stringify({ container_ids: selectedContainers }),
-		})
-		.then(response => response.json())
-		.then(data => {
-			if (data.success) {
-				showNotification(`Successfully deleted ${selectedContainers.length} container(s)`, 'success');
-				setTimeout(() => window.location.reload(), 1000);
-			} else {
-				showNotification('Error deleting containers: ' + (data.error || "Unknown error"), 'error');
-			}
-		})
-		.catch(error => {
-			console.error("Error:", error);
-			showNotification('Error deleting containers', 'error');
+			headers: { "Content-Type": "application/json", "CSRF-Token": init.csrfNonce },
+			body: JSON.stringify({ instance_ids: selected }),
+		}).then(r => r.json()).then(data => {
+			if (data.success) location.reload();
+			else alert("Error: " + data.error);
 		});
 	}
 
-	function showNotification(message, type) {
-		Swal.fire({
-			icon: type === 'error' ? 'error' : (type === 'success' ? 'success' : (type === 'warning' ? 'warning' : 'info')),
-			title: message,
-			showConfirmButton: false,
-			timer: 2500,
-			position: 'top-end',
-			toast: true
+	function emergencyStop() {
+		if (!confirm('EMERGENCY: Stop ALL containers?')) return;
+		fetch('{{ url_for("containers_admin.api_emergency_stop") }}', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json', 'CSRF-Token': init.csrfNonce }
+		}).then(r => r.json()).then(data => {
+			if (data.success) { alert('Stopped ' + data.stopped); location.reload(); }
+			else alert('Error: ' + data.error);
 		});
 	}
 </script>
@@ -393,10 +438,6 @@
 
 .btn-group-sm > .btn {
 	padding: 0.25rem 0.5rem;
-}
-
-.bg-opacity-10 {
-	--bs-bg-opacity: 0.1;
 }
 
 .align-middle > td, .align-middle > th {

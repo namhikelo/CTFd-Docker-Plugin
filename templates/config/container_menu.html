@@ -1,0 +1,15 @@
+<li class="nav-item">
+	<a class="nav-link {% if active_page == 'dashboard' %}active{% endif %}" href="{{ url_for('containers_admin.dashboard') }}">
+		<i class="fas fa-server me-3"></i>Instances
+	</a>
+</li>
+<li class="nav-item">
+	<a class="nav-link {% if active_page == 'settings' %}active{% endif %}" href="{{ url_for('containers_admin.settings') }}">
+		<i class="fas fa-cog me-3"></i>Settings
+	</a>
+</li>
+<li class="nav-item">
+	<a class="nav-link {% if active_page == 'cheats' %}active{% endif %}" href="{{ url_for('containers_admin.cheats') }}">
+		<i class="fas fa-shield-alt me-3"></i>Cheat Logs
+	</a>
+</li>
